@@ -48,7 +48,7 @@ public final class Socks5Server {
              .childChannelInitializer { channel in
                  // Ensure we don't read faster than we can write by adding the BackPressureHandler into the pipeline.
                  channel.pipeline.addHandler(BackPressureHandler()).flatMap { v in
-                    channel.pipeline.addHandler(SocksHandler(config: config))
+                    channel.pipeline.addHandler(ShadowsocksHandler(config: config))
                  }
              }
 

@@ -1,46 +1,32 @@
 //
-//  SocksHandler.swift
-//  Socks5Server
+//  ShadowsocksHandler.swift
+//  
 //
-//  Created by Purkylin King on 2020/9/25.
+//  Created by Purkylin King on 2020/10/15.
 //
 
 import Foundation
 import NIO
 import Logging
 
-private let logger = Logger(label: "handler")
+private var logger = Logger(label: "handler")
 
-class SocksHandler: ChannelInboundHandler {
+class ShadowsocksHandler: ChannelInboundHandler {
     typealias InboundIn = SocksRequest
     typealias OutboundOut = SocksResponse
     
     let serverPort: Int
     let auth: SocksServerConfiguration.Auth
     
+    var requestHost: SocksAddress!
+    
     init(config: SocksServerConfiguration) {
         self.serverPort = config.port
         self.auth = config.auth
+        logger.logLevel = .debug
     }
             
     private let encoder = MessageToByteHandler(SocksEncoder())
-    
-    private var needAuth: Bool {
-        if case .pass = auth {
-            return true
-        } else {
-            return false
-        }
-    }
-    
-    private func checkAuth(username: String, password: String) -> Bool {
-        if case let .pass(rightUsername, rightPassword) = auth {
-            if username == rightUsername && password == rightPassword {
-                return true
-            }
-        }
-        return false
-    }
     
     func channelActive(context: ChannelHandlerContext) {
         let decoder = ByteToMessageHandler(SocksInitialDecoder())
@@ -56,35 +42,8 @@ class SocksHandler: ChannelInboundHandler {
     
     func handleInitialRequest(context: ChannelHandlerContext, authTypes: [SocksAuthType]) {
         logger.debug("receive initial socks request")
-        
-        let responseMethod: SocksAuthType
-        
-        if needAuth {
-            if authTypes.contains(.password) {
-                responseMethod = .password
-            } else {
-                responseMethod = .unsupported
-            }
-        } else {
-            if authTypes.contains(.none) {
-                responseMethod = .none
-            } else {
-                responseMethod = .unsupported
-            }
-        }
-        
-        switch responseMethod {
-        case .none:
-            replaceDecoderHandler(context: context, newHandler: ByteToMessageHandler(SocksCmdDecoder()))
-        case .password:
-            replaceDecoderHandler(context: context, newHandler: ByteToMessageHandler(SocksAuthDecoder()))
-        case .unsupported:
-            break
-        default:
-            fatalError()
-        }
-        
-        let output = SocksResponse.initial(method: responseMethod)
+        replaceDecoderHandler(context: context, newHandler: ByteToMessageHandler(SocksCmdDecoder()))
+        let output = SocksResponse.initial(method: .none)
         context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
     }
     
@@ -99,25 +58,18 @@ class SocksHandler: ChannelInboundHandler {
             if cmd == .connect {
                 logger.info("request host: \(addr)")
                 context.pipeline.remove(handlerType: ByteToMessageHandler<SocksInitialDecoder>.self, promise: nil)
-                connectTo(host: addr.host, port: addr.port, context: context)
+//                connectTo(host: addr.host, port: addr.port, context: context)
+                self.requestHost = addr
+                connectTo(host: "103.99.179.185", port: 9528, context: context)
+//                connectTo(host: "localhost", port: 9528, context: context)
+
             } else {
                 logger.error("unsupported command: \(cmd.rawValue)")
                 let output = SocksResponse.command(rep: .unsupported, atyp: .ipv4, addr: SocksAddress.zeroV4)
                 context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
             }
-        case .auth(let username, let password):
-            logger.debug("receive auth socks request")
-            let success = checkAuth(username: username, password: password)
-            
-            let output = SocksResponse.auth(success: success)
-            context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
-            
-            if success {
-                replaceDecoderHandler(context: context, newHandler: ByteToMessageHandler(SocksCmdDecoder()))
-            } else {
-                logger.error("wrong username/password, \(username):\(password)")
-                context.channel.close(mode: .output, promise: nil)
-            }
+        default:
+            context.channel.close(mode: .all, promise: nil)
         }
     }
     
@@ -143,16 +95,11 @@ class SocksHandler: ChannelInboundHandler {
         logger.info("connected to \(channel.remoteAddress!)")
         let output = SocksResponse.command(rep: .success, atyp: .ipv4, addr: SocksAddress.localAddress)
         
-//        context.writeAndFlush(self.wrapOutboundOut(output)).flatMap {
-//            context.pipeline.removeHandler(self.encoder)
-//        }.whenComplete { _ in
-//            self.glue(peerChannel: channel, context: context)
-//        }
-//
-        context.pipeline.removeHandler(self.encoder)
-        self.glue(peerChannel: channel, context: context)
-
-
+        context.writeAndFlush(self.wrapOutboundOut(output)).flatMap {
+            context.pipeline.removeHandler(self.encoder)
+        }.whenComplete { _ in
+            self.glue(peerChannel: channel, context: context)
+        }
     }
     
     func connectFailed(error: Error, context: ChannelHandlerContext) {
@@ -164,9 +111,20 @@ class SocksHandler: ChannelInboundHandler {
     }
     
     func glue(peerChannel: Channel, context: ChannelHandlerContext) {
-        let (localGue, peerGlue) = GlueHandler.matchedPair()
-        let output = SocksResponse.command(rep: .success, atyp: .ipv4, addr: SocksAddress.localAddress)
-        localGue.pendingBytes = output.toBytes()
+        let salt = Data.random(length: 32)
+        print("salt: \(salt.hexString())")
+        let cryptor = Cryptor(password: "mygod", encryptSalt: salt)
+        
+        let (localGue, peerGlue) = SSRelayHandler.matchedPair(cryptor: cryptor)
+        localGue.isLocal = true
+        
+        let response = SocksResponse.command(rep: .success, atyp: .domain, addr: requestHost).toBytes()[3...]
+        let info = try! cryptor.encrypt(payload: Array(response))
+        let pendingBytes = info
+        
+        var buffer = peerChannel.allocator.buffer(capacity: pendingBytes.count)
+        buffer.writeBytes(pendingBytes)
+        peerChannel.write(NIOAny(buffer), promise: nil)
 
         context.channel.pipeline.addHandler(localGue).and(peerChannel.pipeline.addHandler(peerGlue)).whenComplete { result in
             switch result {
@@ -181,24 +139,4 @@ class SocksHandler: ChannelInboundHandler {
     }
 }
 
-extension SocksHandler: RemovableChannelHandler { }
-
-extension MessageToByteHandler: RemovableChannelHandler { }
-
-class SocksEncoder: MessageToByteEncoder, RemovableChannelHandler {
-    typealias OutboundIn = SocksResponse
-    
-    func encode(data: SocksResponse, out: inout ByteBuffer) throws {
-        logger.debug("out: \(data.toBytes())")
-        out.writeBytes(data.toBytes())
-    }
-}
-
-extension ChannelPipeline {
-    public func remove<Handler: RemovableChannelHandler>(handlerType: Handler.Type, promise: EventLoopPromise<Void>?) {
-        let future = self.handler(type: handlerType).flatMap { handler -> EventLoopFuture<Void> in
-            return self.removeHandler(handler)
-        }
-        future.cascade(to: nil)
-    }
-}
+extension ShadowsocksHandler: RemovableChannelHandler { }

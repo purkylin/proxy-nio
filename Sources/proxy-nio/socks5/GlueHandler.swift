@@ -7,7 +7,7 @@
 
 import NIO
 
-final class GlueHandler {
+class GlueHandler {
     private var partner: GlueHandler?
 
     private var context: ChannelHandlerContext?
@@ -33,10 +33,7 @@ extension GlueHandler {
 
 extension GlueHandler {
     func channelActive(context: ChannelHandlerContext) {
-        if pendingBytes.count > 0 {
-            let buffer = context.channel.allocator.buffer(bytes: pendingBytes)
-            context.write(NIOAny(buffer), promise: nil)
-        }
+
     }
     
     private func partnerWrite(_ data: NIOAny) {
@@ -75,6 +72,13 @@ extension GlueHandler: ChannelDuplexHandler {
 
     func handlerAdded(context: ChannelHandlerContext) {
         self.context = context
+        
+        if pendingBytes.count > 0 {
+            let buffer = context.channel.allocator.buffer(bytes: pendingBytes)
+            let out = NIOAny(buffer)
+            context.write(out, promise: nil)
+            context.flush()
+        }
     }
 
     func handlerRemoved(context: ChannelHandlerContext) {

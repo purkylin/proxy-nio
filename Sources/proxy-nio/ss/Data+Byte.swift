@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CryptoKit
 
 extension Data {
     init?(hex: String) {
@@ -30,11 +31,39 @@ extension Data {
         return self.map { String(format:"%02x", $0) }.joined()
     }
     
+    func md5() -> Data {
+        var md5 = Insecure.MD5()
+        md5.update(data: self)
+        let digest = Data(md5.finalize())
+        return digest
+    }
+    
     static func random(length: Int) -> Data {
         var data = Data(count: length)
         _ = data.withUnsafeMutableBytes {
           SecRandomCopyBytes(kSecRandomDefault, length, $0.baseAddress!)
         }
         return data
+    }
+}
+
+extension Array where Element: FixedWidthInteger {
+    func toInt<T: FixedWidthInteger>(bigEndian: Bool = true) -> T? {
+        let size = MemoryLayout<T>.size
+        guard self.count >= size else {
+            return nil
+        }
+        
+        var bytes = Array(self.prefix(size))
+        
+        if !bigEndian {
+            bytes = Array(bytes.reversed())
+        }
+        
+        let num = bytes.reduce(0) { soFar, byte in
+            return soFar << 8 | T(byte)
+        }
+        
+        return num
     }
 }

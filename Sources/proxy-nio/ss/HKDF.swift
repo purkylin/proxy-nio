@@ -39,3 +39,17 @@ func hkdf_sha1(_ key: Data, salt: Data, info: Data, outputSize: Int = 20) -> Dat
 
     return hkdf.prefix(outputSize)
 }
+
+func evpBytesToKey(password:String, keyLen:Int) -> [UInt8] {
+    var m = [Data]()
+    guard let passwd = password.data(using: String.Encoding.utf8) else {
+        return []
+    }
+
+    while m.reduce(0, {$0 + $1.count}) < keyLen {
+        let data = m.count > 0 ? m.last! + passwd : passwd
+        m.append(data.md5())
+    }
+    let final = m.reduce(Data(), +)
+    return Array(final.bytes[0...(keyLen - 1)])
+}
