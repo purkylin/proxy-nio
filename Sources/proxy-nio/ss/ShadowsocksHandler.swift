@@ -9,9 +9,9 @@ import Foundation
 import NIO
 import Logging
 
-private var logger = Logger(label: "handler")
-
 class ShadowsocksHandler: ChannelInboundHandler {
+    private var logger = Logger(label: "handler")
+
     typealias InboundIn = SocksRequest
     typealias OutboundOut = SocksResponse
     
@@ -70,7 +70,7 @@ class ShadowsocksHandler: ChannelInboundHandler {
                 connectTo(host: ip, port: port, context: context)
             } else {
                 logger.error("unsupported command: \(cmd.rawValue)")
-                let output = SocksResponse.command(rep: .unsupported, atyp: .ipv4, addr: SocksAddress.zeroV4)
+                let output = SocksResponse.command(rep: .unsupported, addr: SocksAddress.zeroV4)
                 context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
             }
         default:
@@ -84,7 +84,6 @@ class ShadowsocksHandler: ChannelInboundHandler {
     }
     
     func connectTo(host: String, port: Int, context: ChannelHandlerContext) {
-        logger.debug("connecting to \(host):\(port)")
         let channelFuture = ClientBootstrap(group: context.eventLoop).connect(host: host, port: port)
         
         channelFuture.whenSuccess { channel in
@@ -97,8 +96,7 @@ class ShadowsocksHandler: ChannelInboundHandler {
     }
     
     func connectSuccessed(channel: Channel, context: ChannelHandlerContext) {
-        logger.info("connected to \(channel.remoteAddress!)")
-        let output = SocksResponse.command(rep: .success, atyp: .ipv4, addr: SocksAddress.localAddress)
+        let output = SocksResponse.command(rep: .success, addr: SocksAddress.localAddress)
         
         context.writeAndFlush(self.wrapOutboundOut(output)).flatMap {
             context.pipeline.removeHandler(self.encoder)
@@ -110,20 +108,21 @@ class ShadowsocksHandler: ChannelInboundHandler {
     func connectFailed(error: Error, context: ChannelHandlerContext) {
         logger.error("connected failed: \(error)")
 
-        let output = SocksResponse.command(rep: .unreachable, atyp: .ipv4, addr: SocksAddress.localAddress)
+        let output = SocksResponse.command(rep: .unreachable, addr: SocksAddress.localAddress)
         context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
         context.close(mode: .output, promise: nil)
     }
     
     func glue(peerChannel: Channel, context: ChannelHandlerContext) {
         let salt = Data.random(length: 32)
-        print("salt: \(salt.hexString())")
         let cryptor = Cryptor(password: "mygod", encryptSalt: salt)
         
         let (localGue, peerGlue) = SSRelayHandler.matchedPair(cryptor: cryptor)
         localGue.isLocal = true
         
-        let response = SocksResponse.command(rep: .success, atyp: .domain, addr: requestHost).toBytes()[3...]
+        
+        
+        let response = SocksResponse.command(rep: .success, addr: requestHost).toBytes()[3...]
         let info = try! cryptor.encrypt(payload: Array(response))
         let pendingBytes = info
         

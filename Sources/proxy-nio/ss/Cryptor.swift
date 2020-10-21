@@ -13,7 +13,12 @@ import Logging
 fileprivate let maxChunkSize = 0x3FFF
 fileprivate let info = "ss-subkey".data(using: .utf8)!
 
-private let logger = Logger(label: "crypto")
+private let logger: Logger =  {
+    
+    var obj = Logger(label: "crypto")
+    obj.logLevel = .info
+    return obj
+}()
 
 struct Nonce {
     let length: Int

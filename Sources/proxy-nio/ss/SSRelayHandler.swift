@@ -130,7 +130,7 @@ extension SSRelayHandler: ChannelDuplexHandler {
     }
 
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        print("error: \(error.localizedDescription)")
+//        print("error: \(error.localizedDescription)")
         self.partner?.partnerCloseFull()
     }
 
