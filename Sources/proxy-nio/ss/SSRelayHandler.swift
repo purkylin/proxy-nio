@@ -7,6 +7,9 @@
 
 import Foundation
 import NIO
+import Logging
+
+private let logger = Logger(label: "relay")
 
 class SSRelayHandler {
     private var partner: SSRelayHandler?
@@ -38,16 +41,13 @@ extension SSRelayHandler {
 }
 
 extension SSRelayHandler {
-    private func partnerWrite(_ data: NIOAny) {
+    private func partnerWrite(_ data: NIOAny, promise: EventLoopPromise<Void>? = nil) {
         guard let context = self.context else { return }
         do {
             if isLocal {
-                let promise = context.eventLoop.makePromise(of: Void.self)
-                promise.
                 var buffer = self.unwrapInboundIn(data)
                 if let bytes = buffer.readBytes(length: buffer.readableBytes) {
                     let ciphertext = try cryptor.decrypt(payload: bytes)
-                    print("decrypt success once")
                     
                     var outBuffer = context.channel.allocator.buffer(capacity: ciphertext.count)
                     outBuffer.writeBytes(ciphertext)
@@ -57,8 +57,6 @@ extension SSRelayHandler {
             } else {
                 var buffer = self.unwrapInboundIn(data)
                 if let bytes = buffer.readBytes(length: buffer.readableBytes) {
-                    print("write to remote: \(bytes.count), \(bytes)")
-
                     let ciphertext = try cryptor.encrypt(payload: bytes)
                     
                     var outBuffer = context.channel.allocator.buffer(capacity: ciphertext.count)
@@ -68,7 +66,7 @@ extension SSRelayHandler {
                 }
             }
         } catch {
-            print("crypto failed")
+            logger.error("crypto failed once")
             partnerCloseFull()
         }
     }
@@ -97,7 +95,6 @@ extension SSRelayHandler {
     }
 }
 
-
 extension SSRelayHandler: ChannelDuplexHandler {
     typealias InboundIn = ByteBuffer
     typealias OutboundIn = ByteBuffer
@@ -113,7 +110,7 @@ extension SSRelayHandler: ChannelDuplexHandler {
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        print("local: \(context.channel.remoteAddress) has read message")
+        logger.debug("receive message from \(context.channel.remoteAddress)")
         self.partner?.partnerWrite(data)
     }
 

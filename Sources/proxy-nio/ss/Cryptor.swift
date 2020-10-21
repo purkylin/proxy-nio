@@ -8,9 +8,12 @@
 import Foundation
 import Crypto
 import struct NIO.ByteBuffer
+import Logging
 
 fileprivate let maxChunkSize = 0x3FFF
 fileprivate let info = "ss-subkey".data(using: .utf8)!
+
+private let logger = Logger(label: "crypto")
 
 struct Nonce {
     let length: Int
@@ -113,6 +116,8 @@ class Cryptor {
                 output = salt.bytes + output
             }
             
+            logger.info("encrypt chunk once")
+            
             return output
         }
     }
@@ -141,9 +146,9 @@ class Cryptor {
             buffer.writeBytes(bytes)
 
             var output = [UInt8]()
-            let backNonce = nonce
             
             while buffer.readableBytes > 0 {
+                let backNonce = nonce
                 var peekBuffer = buffer
                 
                 guard let data1 = peekBuffer.readBytes(length: 2) else {
@@ -156,14 +161,9 @@ class Cryptor {
                 }
                 
                 let lengthData = try decrypt(bytes: data1, tag: tag1)
-//                let length = withUnsafeBytes(of: lengthData) { pointer in
-//                    return pointer.load(as: UInt16.self).bigEndian
-//                }
-                
                 let length: UInt16 = lengthData.toInt()!
-                
                 nonce.increment()
-                print("len:", length)
+
                 guard let data2 = peekBuffer.readBytes(length: Int(length)) else {
                     self.nonce = backNonce
                     break
@@ -176,6 +176,8 @@ class Cryptor {
                 output += try decrypt(bytes: data2, tag: tag2)
                 nonce.increment()
                 buffer = peekBuffer
+                
+                logger.info("decrypt success once")
             }
             
             return output

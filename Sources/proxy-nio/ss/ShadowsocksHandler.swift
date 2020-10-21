@@ -58,11 +58,16 @@ class ShadowsocksHandler: ChannelInboundHandler {
             if cmd == .connect {
                 logger.info("request host: \(addr)")
                 context.pipeline.remove(handlerType: ByteToMessageHandler<SocksInitialDecoder>.self, promise: nil)
-//                connectTo(host: addr.host, port: addr.port, context: context)
                 self.requestHost = addr
-                connectTo(host: "103.99.179.185", port: 9528, context: context)
-//                connectTo(host: "localhost", port: 9528, context: context)
-
+                guard let ip = ProcessInfo.processInfo.environment["SERVER_IP"] else {
+                    fatalError("Not found server ip")
+                }
+                
+                guard let portString = ProcessInfo.processInfo.environment["SERVER_PORT"] else {
+                    fatalError("Not found server port")
+                }
+                let port = Int(portString, radix: 10)!
+                connectTo(host: ip, port: port, context: context)
             } else {
                 logger.error("unsupported command: \(cmd.rawValue)")
                 let output = SocksResponse.command(rep: .unsupported, atyp: .ipv4, addr: SocksAddress.zeroV4)
