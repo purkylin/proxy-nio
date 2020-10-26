@@ -73,18 +73,30 @@ enum SocksAddress {
         return .v4(addr: IPAddress.v4(IPAddress.IPv4Address.zero), port: 7777)
     }
     
+    static var udpAddress: Self {
+        return .v4(addr: IPAddress.v4(IPAddress.IPv4Address.zero), port: 1080)
+    }
+    
     var bytes: [UInt8] {
         switch self {
         case .v4(let address, let port):
-            let portBytes: [UInt8] = byteArray(from: UInt16(port))
-            return address.bytes + portBytes
+            return address.bytes + UInt16(port).bytes
         case .v6(let address, let port):
-            let portBytes: [UInt8] = byteArray(from: UInt16(port))
-            return address.bytes + portBytes
+            return address.bytes + UInt16(port).bytes
         case .domain(let address, let port):
-            let portBytes: [UInt8] = byteArray(from: UInt16(port))
             let count: UInt8 = UInt8(address.count)
-            return byteArray(from: count) + address.utf8 + portBytes
+            return count.bytes + address.utf8 + UInt16(port).bytes
+        }
+    }
+    
+    var atyp: SocksCmdAtyp {
+        switch self {
+        case .v4:
+            return .ipv4
+        case .v6:
+            return .ipv6
+        case .domain:
+            return .domain
         }
     }
     
@@ -110,9 +122,3 @@ enum SocksAddress {
         }
     }
 }
-
-// big endian
-func byteArray<T>(from value: T) -> [UInt8] where T: FixedWidthInteger {
-    withUnsafeBytes(of: value.bigEndian, Array.init)
-}
-

@@ -68,6 +68,9 @@ class ShadowsocksHandler: ChannelInboundHandler {
                 }
                 let port = Int(portString, radix: 10)!
                 connectTo(host: ip, port: port, context: context)
+            } else if cmd == .udp {
+                let output = SocksResponse.command(rep: .unsupported, addr: SocksAddress.zeroV4)
+                context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
             } else {
                 logger.error("unsupported command: \(cmd.rawValue)")
                 let output = SocksResponse.command(rep: .unsupported, addr: SocksAddress.zeroV4)

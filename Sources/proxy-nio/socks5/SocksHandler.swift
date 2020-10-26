@@ -100,6 +100,16 @@ class SocksHandler: ChannelInboundHandler {
                 logger.info("request host: \(addr)")
                 context.pipeline.remove(handlerType: ByteToMessageHandler<SocksInitialDecoder>.self, promise: nil)
                 connectTo(host: addr.host, port: addr.port, context: context)
+            } else if cmd == .udp {
+                logger.info("receive udp cmd request")
+                let output = SocksResponse.command(rep: .success, addr: SocksAddress.udpAddress)
+                context.writeAndFlush(self.wrapOutboundOut(output)).whenComplete { _ in
+                    context.pipeline.removeHandler(self.encoder)
+                }
+      
+//                connectTo2(host: "127.0.0.1", port: 1080, context: context)
+
+
             } else {
                 logger.error("unsupported command: \(cmd.rawValue)")
                 let output = SocksResponse.command(rep: .unsupported, addr: SocksAddress.zeroV4)
@@ -136,6 +146,17 @@ class SocksHandler: ChannelInboundHandler {
         
         channelFuture.whenFailure { error in
             self.connectFailed(error: error, context: context)
+        }
+    }
+    
+    func connectTo2(host: String, port: Int, context: ChannelHandlerContext) {
+        logger.debug("connecting to \(host):\(port)")
+        let bootstrap = DatagramBootstrap(group: context.eventLoop)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+        
+        let channelFuture = bootstrap.bind(host: host, port: port)
+        channelFuture.whenSuccess { channel in
+            self.glue(peerChannel: channel, context: context)
         }
     }
     
@@ -202,3 +223,10 @@ extension ChannelPipeline {
         future.cascade(to: nil)
     }
 }
+
+//class UDPHandler: ChannelInboundHandler {
+//    typealias Inbound = <#type expression#>
+//    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+//        <#code#>
+//    }
+//}

@@ -1,35 +1,33 @@
 //
-//  SSRelayHandler.swift
+//  RelayHandler.swift
 //  
 //
-//  Created by Purkylin King on 2020/10/15.
+//  Created by Purkylin King on 2020/10/23.
 //
 
 import Foundation
 import NIO
 import Logging
 
-private let logger = Logger(label: "relay")
-
-class SSRelayHandler {
-    private var partner: SSRelayHandler?
+class RelayHandler {
+    private var partner: RelayHandler?
 
     private var context: ChannelHandlerContext?
 
     private var pendingRead: Bool = false
     
     var isLocal: Bool = false
-    var cryptor: Cryptor
+    var cryptor: Cryptor?
 
-    private init(cryptor: Cryptor) {
+    private init(cryptor: Cryptor?) {
         self.cryptor = cryptor
     }
 }
 
-extension SSRelayHandler {
-    static func matchedPair(cryptor: Cryptor) -> (SSRelayHandler, SSRelayHandler) {
-        let first = SSRelayHandler(cryptor: cryptor)
-        let second = SSRelayHandler(cryptor: cryptor)
+extension RelayHandler {
+    static func matchedPair(cryptor: Cryptor? = nil) -> (RelayHandler, RelayHandler) {
+        let first = RelayHandler(cryptor: cryptor)
+        let second = RelayHandler(cryptor: cryptor)
 
         first.partner = second
         second.partner = first
@@ -38,9 +36,15 @@ extension SSRelayHandler {
     }
 }
 
-extension SSRelayHandler {
+extension RelayHandler {
     private func partnerWrite(_ data: NIOAny, promise: EventLoopPromise<Void>? = nil) {
         guard let context = self.context else { return }
+        
+        guard let cryptor = self.cryptor  else {
+            context.write(data, promise: nil)
+            return
+        }
+        
         do {
             if isLocal {
                 var buffer = self.unwrapInboundIn(data)
@@ -64,7 +68,6 @@ extension SSRelayHandler {
                 }
             }
         } catch {
-            logger.error("crypto failed once")
             partnerCloseFull()
         }
     }
@@ -93,7 +96,7 @@ extension SSRelayHandler {
     }
 }
 
-extension SSRelayHandler: ChannelDuplexHandler {
+extension RelayHandler: ChannelDuplexHandler {
     typealias InboundIn = ByteBuffer
     typealias OutboundIn = ByteBuffer
     typealias OutboundOut = ByteBuffer
@@ -108,7 +111,6 @@ extension SSRelayHandler: ChannelDuplexHandler {
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        logger.debug("receive message from \(context.channel.remoteAddress)")
         self.partner?.partnerWrite(data)
     }
 

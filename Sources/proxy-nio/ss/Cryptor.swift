@@ -46,7 +46,7 @@ struct Nonce {
     }
 }
 
-class Cryptor {
+public class Cryptor {
     var encryptor: Encryptor
     var decryptor: Decryptor?
     var password: String
