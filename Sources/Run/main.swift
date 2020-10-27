@@ -10,10 +10,10 @@ import proxy_nio
 import Crypto
 import NIO
 
-DispatchQueue.global().async {
-    let udp = UDPServer()
-    udp.start()
-}
+//DispatchQueue.global().async {
+//    let udp = UDPServer()
+//    udp.start()
+//}
 
 //let udp = UDPServer()
 //udp.start()

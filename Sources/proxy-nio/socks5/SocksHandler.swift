@@ -102,14 +102,14 @@ class SocksHandler: ChannelInboundHandler {
                 connectTo(host: addr.host, port: addr.port, context: context)
             } else if cmd == .udp {
                 logger.info("receive udp cmd request")
-                let output = SocksResponse.command(rep: .success, addr: SocksAddress.udpAddress)
-                context.writeAndFlush(self.wrapOutboundOut(output)).whenComplete { _ in
+                
+        
+                createUDP(context: context).flatMap { channel -> EventLoopFuture<Void> in
+                    let output = SocksResponse.command(rep: .success, addr: SocksAddress.addr(ip: "0.0.0.0", port: channel.localAddress!.port!))
+                    return context.writeAndFlush(self.wrapOutboundOut(output))
+                }.whenComplete { _ in
                     context.pipeline.removeHandler(self.encoder)
                 }
-      
-//                connectTo2(host: "127.0.0.1", port: 1080, context: context)
-
-
             } else {
                 logger.error("unsupported command: \(cmd.rawValue)")
                 let output = SocksResponse.command(rep: .unsupported, addr: SocksAddress.zeroV4)
@@ -147,6 +147,18 @@ class SocksHandler: ChannelInboundHandler {
         channelFuture.whenFailure { error in
             self.connectFailed(error: error, context: context)
         }
+    }
+    
+    func createUDP(context: ChannelHandlerContext) -> EventLoopFuture<Channel> {
+        let bootstrap = DatagramBootstrap(group: context.eventLoop)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+            .channelOption(ChannelOptions.recvAllocator, value: FixedSizeRecvByteBufferAllocator(capacity: 30 * 2048))
+            .channelInitializer { channel in
+                channel.pipeline.addHandler(UDPRelayHandler())
+        }
+
+        let channelFuture = try! bootstrap.bind(host: "0.0.0.0", port: 0)
+        return channelFuture
     }
     
     func connectTo2(host: String, port: Int, context: ChannelHandlerContext) {
@@ -230,3 +242,65 @@ extension ChannelPipeline {
 //        <#code#>
 //    }
 //}
+
+
+class UDPRelayHandler: ChannelInboundHandler {
+    public typealias InboundIn = AddressedEnvelope<ByteBuffer>
+    public typealias OutboundOut = AddressedEnvelope<ByteBuffer>
+    
+    var source: SocketAddress? = nil
+
+    public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let envelope = self.unwrapInboundIn(data)
+        var buffer = envelope.data
+        
+        if source == nil {
+            source = envelope.remoteAddress
+        }
+        
+        let isLocal = source == envelope.remoteAddress
+        
+        if isLocal {
+            guard buffer.readInteger(as: UInt16.self) == 0 else {
+                return
+            }
+            
+            let frag = buffer.readInteger(as: UInt8.self)!
+            let atypRaw = buffer.readInteger(as: UInt8.self)!
+            let atyp = SocksCmdAtyp(rawValue: atypRaw)!
+            
+            let addr = buffer.readAddress(atyp: atyp)!
+            let data = buffer.readBytes(length: buffer.readableBytes)!
+            let targetAddress = try! SocketAddress.makeAddressResolvingHost(addr.host, port: addr.port)
+            print(envelope.remoteAddress)
+      
+            let outBuffer = context.channel.allocator.buffer(bytes: data)
+       
+            let outEnvolope = AddressedEnvelope(remoteAddress: targetAddress, data: outBuffer, metadata: nil)
+            
+            context.writeAndFlush(self.wrapOutboundOut(outEnvolope), promise: nil)
+        } else {
+            let header: [UInt8] = [0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]
+            let data = buffer.readBytes(length: buffer.readableBytes)!
+            let outbuffer = context.channel.allocator.buffer(bytes: header + data)
+            let envolope = AddressedEnvelope(remoteAddress: source!, data: outbuffer, metadata: nil)
+            context.writeAndFlush(self.wrapOutboundOut(envolope), promise: nil)
+        }
+    }
+
+    public func channelReadComplete(context: ChannelHandlerContext) {
+        // As we are not really interested getting notified on success or failure we just pass nil as promise to
+        // reduce allocations.
+        context.flush()
+    }
+
+    public func errorCaught(context: ChannelHandlerContext, error: Error) {
+        print("error: ", error)
+
+        // As we are not really interested getting notified on success or failure we just pass nil as promise to
+        // reduce allocations.
+        context.close(promise: nil)
+    }
+
+}
+    

@@ -77,6 +77,10 @@ enum SocksAddress {
         return .v4(addr: IPAddress.v4(IPAddress.IPv4Address.zero), port: 1080)
     }
     
+    static func addr(ip: String, port: Int) -> SocksAddress {
+        return .v4(addr: IPAddress.v4(IPAddress.IPv4Address.zero), port: port)
+    }
+    
     var bytes: [UInt8] {
         switch self {
         case .v4(let address, let port):
