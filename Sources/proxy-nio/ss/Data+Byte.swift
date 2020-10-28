@@ -47,8 +47,8 @@ extension Data {
     }
 }
 
-extension Array where Element: FixedWidthInteger {
-    func toInt<T: FixedWidthInteger>(bigEndian: Bool = true) -> T? {
+extension DataProtocol {
+    func toInteger<T: FixedWidthInteger>(as: T.Type = T.self, bigEndian: Bool = true) -> T? {
         let size = MemoryLayout<T>.size
         guard self.count >= size else {
             return nil
@@ -57,13 +57,13 @@ extension Array where Element: FixedWidthInteger {
         var bytes = Array(self.prefix(size))
         
         if !bigEndian {
-            bytes = Array(bytes.reversed())
+            bytes = bytes.reversed()
         }
         
-        let num = bytes.reduce(0) { soFar, byte in
+        let value = bytes.reduce(0) { soFar, byte in
             return soFar << 8 | T(byte)
         }
         
-        return num
+        return value
     }
 }

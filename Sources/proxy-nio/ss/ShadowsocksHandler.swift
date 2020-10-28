@@ -40,7 +40,7 @@ class ShadowsocksHandler: ChannelInboundHandler {
             .cascade(to: nil)
     }
     
-    func handleInitialRequest(context: ChannelHandlerContext, authTypes: [SocksAuthType]) {
+    func handleInitialRequest(context: ChannelHandlerContext, authTypes: [Socks.AuthType]) {
         logger.debug("receive initial socks request")
         replaceDecoderHandler(context: context, newHandler: ByteToMessageHandler(SocksCmdDecoder()))
         let output = SocksResponse.initial(method: .none)
@@ -53,7 +53,7 @@ class ShadowsocksHandler: ChannelInboundHandler {
         switch request {
         case .initial(let authTypes):
             handleInitialRequest(context: context, authTypes: authTypes)
-        case .command(let cmd, _, let addr):
+        case .command(let cmd, let addr):
             logger.debug("receive cmd socks request")
             if cmd == .connect {
                 logger.info("request host: \(addr)")
@@ -69,12 +69,14 @@ class ShadowsocksHandler: ChannelInboundHandler {
                 let port = Int(portString, radix: 10)!
                 connectTo(host: ip, port: port, context: context)
             } else if cmd == .udp {
-                let output = SocksResponse.command(rep: .unsupported, addr: SocksAddress.zeroV4)
-                context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
+                let addr = SocksV4Address.localAddress(on: 0)
+                let response = SocksResponse.command(rep: .unsupported, addr: addr)
+                context.writeAndFlush(self.wrapOutboundOut(response), promise: nil)
             } else {
                 logger.error("unsupported command: \(cmd.rawValue)")
-                let output = SocksResponse.command(rep: .unsupported, addr: SocksAddress.zeroV4)
-                context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
+                let addr = SocksV4Address.localAddress(on: 0)
+                let response = SocksResponse.command(rep: .unsupported, addr: addr)
+                context.writeAndFlush(self.wrapOutboundOut(response), promise: nil)
             }
         default:
             context.channel.close(mode: .all, promise: nil)
@@ -99,7 +101,8 @@ class ShadowsocksHandler: ChannelInboundHandler {
     }
     
     func connectSuccessed(channel: Channel, context: ChannelHandlerContext) {
-        let output = SocksResponse.command(rep: .success, addr: SocksAddress.localAddress)
+        let addr = SocksV4Address.localAddress(on: 0)
+        let output = SocksResponse.command(rep: .success, addr: addr)
         
         context.writeAndFlush(self.wrapOutboundOut(output)).flatMap {
             context.pipeline.removeHandler(self.encoder)
@@ -111,7 +114,8 @@ class ShadowsocksHandler: ChannelInboundHandler {
     func connectFailed(error: Error, context: ChannelHandlerContext) {
         logger.error("connected failed: \(error)")
 
-        let output = SocksResponse.command(rep: .unreachable, addr: SocksAddress.localAddress)
+        let addr = SocksV4Address.localAddress(on: 0)
+        let output = SocksResponse.command(rep: .unreachable, addr: addr)
         context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
         context.close(mode: .output, promise: nil)
     }

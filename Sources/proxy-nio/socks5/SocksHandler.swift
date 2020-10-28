@@ -7,9 +7,6 @@
 
 import Foundation
 import NIO
-import Logging
-
-private let logger = Logger(label: "handler")
 
 class SocksHandler: ChannelInboundHandler {
     typealias InboundIn = SocksRequest
@@ -54,10 +51,10 @@ class SocksHandler: ChannelInboundHandler {
             .cascade(to: nil)
     }
     
-    func handleInitialRequest(context: ChannelHandlerContext, authTypes: [SocksAuthType]) {
+    func handleInitialRequest(context: ChannelHandlerContext, authTypes: [Socks.AuthType]) {
         logger.debug("receive initial socks request")
         
-        let responseMethod: SocksAuthType
+        let responseMethod: Socks.AuthType
         
         if needAuth {
             if authTypes.contains(.password) {
@@ -94,7 +91,7 @@ class SocksHandler: ChannelInboundHandler {
         switch request {
         case .initial(let authTypes):
             handleInitialRequest(context: context, authTypes: authTypes)
-        case .command(let cmd, _, let addr):
+        case .command(let cmd, let addr):
             logger.debug("receive cmd socks request")
             if cmd == .connect {
                 logger.info("request host: \(addr)")
@@ -105,14 +102,16 @@ class SocksHandler: ChannelInboundHandler {
                 
         
                 createUDP(context: context).flatMap { channel -> EventLoopFuture<Void> in
-                    let output = SocksResponse.command(rep: .success, addr: SocksAddress.addr(ip: "0.0.0.0", port: channel.localAddress!.port!))
+                    let addr = SocksV4Address.localAddress(on: channel.localAddress!.port!)
+                    let output = SocksResponse.command(rep: .success, addr: addr)
                     return context.writeAndFlush(self.wrapOutboundOut(output))
                 }.whenComplete { _ in
                     context.pipeline.removeHandler(self.encoder)
                 }
             } else {
                 logger.error("unsupported command: \(cmd.rawValue)")
-                let output = SocksResponse.command(rep: .unsupported, addr: SocksAddress.zeroV4)
+                let addr = SocksV4Address.localAddress(on: 0)
+                let output = SocksResponse.command(rep: .unsupported, addr: addr)
                 context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
             }
         case .auth(let username, let password):
@@ -191,14 +190,14 @@ class SocksHandler: ChannelInboundHandler {
     func connectFailed(error: Error, context: ChannelHandlerContext) {
         logger.error("connected failed: \(error)")
 
-        let output = SocksResponse.command(rep: .unreachable, addr: SocksAddress.localAddress)
+        let output = SocksResponse.command(rep: .unreachable, addr: SocksV4Address.localAddress(on: 0))
         context.writeAndFlush(self.wrapOutboundOut(output), promise: nil)
         context.close(mode: .output, promise: nil)
     }
     
     func glue(peerChannel: Channel, context: ChannelHandlerContext) {
         let (localGue, peerGlue) = GlueHandler.matchedPair()
-        let output = SocksResponse.command(rep: .success, addr: SocksAddress.localAddress)
+        let output = SocksResponse.command(rep: .success, addr: SocksV4Address.localAddress(on: 0))
         localGue.pendingBytes = output.toBytes()
 
         context.channel.pipeline.addHandler(localGue).and(peerChannel.pipeline.addHandler(peerGlue)).whenComplete { result in
@@ -267,7 +266,7 @@ class UDPRelayHandler: ChannelInboundHandler {
             
             let frag = buffer.readInteger(as: UInt8.self)!
             let atypRaw = buffer.readInteger(as: UInt8.self)!
-            let atyp = SocksCmdAtyp(rawValue: atypRaw)!
+            let atyp = Socks.Atyp(rawValue: atypRaw)!
             
             let addr = buffer.readAddress(atyp: atyp)!
             let data = buffer.readBytes(length: buffer.readableBytes)!

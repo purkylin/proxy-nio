@@ -13,13 +13,6 @@ import Logging
 fileprivate let maxChunkSize = 0x3FFF
 fileprivate let info = "ss-subkey".data(using: .utf8)!
 
-private let logger: Logger =  {
-    
-    var obj = Logger(label: "crypto")
-    obj.logLevel = .info
-    return obj
-}()
-
 struct Nonce {
     let length: Int
     private var storage: [UInt8]
@@ -166,7 +159,7 @@ public class Cryptor {
                 }
                 
                 let lengthData = try decrypt(bytes: data1, tag: tag1)
-                let length: UInt16 = lengthData.toInt()!
+                let length: UInt16 = lengthData.toInteger()!
                 nonce.increment()
 
                 guard let data2 = peekBuffer.readBytes(length: Int(length)) else {

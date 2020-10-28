@@ -9,8 +9,6 @@ import Foundation
 import NIO
 import Logging
 
-private let logger = Logger(label: "relay")
-
 class SSRelayHandler {
     private var partner: SSRelayHandler?
 

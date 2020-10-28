@@ -8,8 +8,6 @@
 import NIO
 import Logging
 
-private let logger = Logger(label: "socks5")
-
 public struct SocksServerConfiguration {
     public enum Auth {
         case none
@@ -35,7 +33,7 @@ public final class Socks5Server {
     
     public func start(config: SocksServerConfiguration = .default) {
         if isRunning {
-            logger.warning("socks server has started")
+            logger.warning("socks5 server has started")
             return
         }
         
@@ -67,7 +65,7 @@ public final class Socks5Server {
             logger.error("start socks server on port \(config.port) failed")
         }
         
-        logger.info("socks server has stopped")
+        logger.info("socks5 server has stopped")
         isRunning = false
     }
     
