@@ -41,17 +41,22 @@ class SocksHandler: ChannelInboundHandler {
     
     func channelActive(context: ChannelHandlerContext) {
         let decoder = ByteToMessageHandler(SocksInitialDecoder())
-        context.pipeline.addHandler(decoder, name: "decoder", position: .before(self)).and(context.pipeline.addHandler(encoder, name: "encoder", position: .before(self))).cascade(to: nil)
+        
+        context.pipeline
+            .addHandler(decoder, name: "decoder", position: .before(self))
+            .and(context.pipeline.addHandler(encoder, name: "encoder", position: .before(self)))
+            .cascade(to: nil)
     }
     
-    func replaceDecoderHandler(context: ChannelHandlerContext, newHandler: RemovableChannelHandler) {
+    private func replaceDecoderHandler(context: ChannelHandlerContext, newHandler: RemovableChannelHandler) {
         let handlerName = "decoder"
-        context.pipeline.removeHandler(name: handlerName)
+        context.pipeline
+            .removeHandler(name: handlerName)
             .and(context.pipeline.addHandler(newHandler, name: handlerName, position: .before(self)))
             .cascade(to: nil)
     }
     
-    func handleInitialRequest(context: ChannelHandlerContext, authTypes: [Socks.AuthType]) {
+    private func handleInitialRequest(context: ChannelHandlerContext, authTypes: [Socks.AuthType]) {
         logger.debug("receive initial socks request")
         
         let responseMethod: Socks.AuthType
@@ -75,10 +80,8 @@ class SocksHandler: ChannelInboundHandler {
             replaceDecoderHandler(context: context, newHandler: ByteToMessageHandler(SocksCmdDecoder()))
         case .password:
             replaceDecoderHandler(context: context, newHandler: ByteToMessageHandler(SocksAuthDecoder()))
-        case .unsupported:
-            break
         default:
-            fatalError()
+            break
         }
         
         let output = SocksResponse.initial(method: responseMethod)
@@ -92,15 +95,13 @@ class SocksHandler: ChannelInboundHandler {
         case .initial(let authTypes):
             handleInitialRequest(context: context, authTypes: authTypes)
         case .command(let cmd, let addr):
-            logger.debug("receive cmd socks request")
             if cmd == .connect {
-                logger.info("request host: \(addr)")
+                logger.info("request host: \(addr.host):\(addr.port)")
                 context.pipeline.remove(handlerType: ByteToMessageHandler<SocksInitialDecoder>.self, promise: nil)
                 connectTo(host: addr.host, port: addr.port, context: context)
             } else if cmd == .udp {
                 logger.info("receive udp cmd request")
                 
-        
                 createUDP(context: context).flatMap { channel -> EventLoopFuture<Void> in
                     let addr = SocksV4Address.localAddress(on: channel.localAddress!.port!)
                     let output = SocksResponse.command(rep: .success, addr: addr)

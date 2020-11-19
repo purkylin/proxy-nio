@@ -32,7 +32,7 @@ struct SocksV4Address: SocksAddress {
 
         guard ret == 1 else { return nil }
 
-        self.storage = withUnsafeBytes(of: v4Addr.s_addr, Array.init)
+        self.storage = withUnsafeBytes(of: v4Addr.s_addr, Array.init) + UInt16(port).bytes
         self.host = host
         self.port = port
     }
@@ -64,6 +64,12 @@ struct SocksV4Address: SocksAddress {
     }
 }
 
+extension SocksV4Address: CustomStringConvertible {
+    var description: String {
+        return "\(host):\(port)"
+    }
+}
+
 struct SocksDomainAddress: SocksAddress {
     var host: String
     var port: Int
@@ -92,7 +98,8 @@ struct SocksDomainAddress: SocksAddress {
         let portBytes = bytes[mid...]
         
         self.host = String(data: Data(hostBytes), encoding: .utf8)!
-        self.port = portBytes.toInteger()!
+        let port = portBytes.toInteger(as: UInt16.self)!
+        self.port = Int(port)
         self.storage = bytes
     }
     
@@ -120,7 +127,7 @@ struct SocksV6Address: SocksAddress {
 
         self.host = host
         self.port = port
-        self.storage = withUnsafeBytes(of: &addr, Array.init)
+        self.storage = withUnsafeBytes(of: &addr, Array.init) + UInt16(port).bytes
     }
     
     init?(bytes: [UInt8]) {
@@ -133,9 +140,9 @@ struct SocksV6Address: SocksAddress {
 
         var buffer = [Int8](repeating: 0, count: Int(INET6_ADDRSTRLEN))
 
-        _ = withUnsafePointer(to: bytes) { pointer in
-            inet_ntop(AF_INET6, pointer, &buffer, UInt32(INET6_ADDRSTRLEN))
-        }
+        withUnsafeMutableBytes(of: &addr.sin6_addr) { $0.copyBytes(from: bytes[0...16]) }
+        
+        inet_ntop(AF_INET6, &addr.sin6_addr, &buffer, UInt32(INET6_ADDRSTRLEN))
 
         self.host = String(cString: buffer)
         let port16: UInt16 = bytes[16...].toInteger()!
@@ -145,5 +152,11 @@ struct SocksV6Address: SocksAddress {
     
     var bytes: [UInt8] {
         return storage
+    }
+}
+
+extension SocksV6Address: CustomStringConvertible {
+    var description: String {
+        return "\(host):\(port)"
     }
 }
