@@ -32,7 +32,6 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio", .upToNextMajor(from: "2.24.0")),
         .package(url: "https://github.com/apple/swift-log", from: "1.4.0"),
         .package(url: "https://github.com/apple/swift-crypto", from: "1.1.2"),
-        
     ],
     targets: targets
 )
