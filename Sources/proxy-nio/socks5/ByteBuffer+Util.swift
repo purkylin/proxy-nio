@@ -11,7 +11,7 @@ import NIO
 extension ByteBuffer {
     @discardableResult
     mutating func skipBytes(_ len: Int) -> Bool {
-        if self.readableBytes > 0 {
+        if self.readableBytes >= len {
             self.moveReaderIndex(forwardBy: len)
             return true
         } else {
@@ -23,26 +23,6 @@ extension ByteBuffer {
         let size = MemoryLayout<T>.size
         guard self.readableBytes >= size else { return nil }
         return getInteger(at: self.readerIndex, endianness: .big, as: `as`)
-    }
-    
-    mutating func readAddress(atyp: Socks.Atyp) -> SocksAddress? {
-        switch atyp {
-        case .v4:
-            let requiredLength = 6
-            guard self.readableBytes >= requiredLength else { return nil }
-            guard let bytes = readBytes(length: requiredLength) else { return nil }
-            return SocksV4Address(bytes: bytes)
-        case .v6:
-            let requiredLength = 18
-            guard self.readableBytes >= requiredLength else { return nil }
-            guard let bytes = readBytes(length: requiredLength) else { return nil }
-            return SocksV6Address(bytes: bytes)
-        case .domain:
-            guard let len = self.peekInteger(as: UInt8.self) else { return nil }
-            let count = Int(len)
-            guard let bytes = self.readBytes(length: count + 3) else { return nil }
-            return SocksDomainAddress(bytes: bytes)
-        }
     }
     
     /// Read a fix length string, first byte represent length

@@ -18,18 +18,18 @@ struct Socks {
         case domain = 3
         case v6 = 4
     }
-
-    enum RequestType: UInt8 {
-        case connect = 1
-        case bind = 2
-        case udp = 3
-    }
     
     enum AuthType: UInt8 {
         case none        = 0x00
         case gssapi      = 0x01
         case password    = 0x02
         case unsupported = 0xFF
+    }
+
+    enum RequestType: UInt8 {
+        case connect = 1
+        case bind = 2
+        case udp = 3
     }
     
     enum ResponseType: UInt8 {
@@ -43,10 +43,6 @@ struct Socks {
         case unsupported
         case unsupportedAddressType
         case undefined
-    }
-    
-    static func setLogLevel() {
-        // TODO
     }
 }
 
