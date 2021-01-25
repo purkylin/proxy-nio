@@ -32,10 +32,6 @@ extension GlueHandler {
 }
 
 extension GlueHandler {
-    func channelActive(context: ChannelHandlerContext) {
-
-    }
-    
     private func partnerWrite(_ data: NIOAny) {
         self.context?.write(data, promise: nil)
     }
@@ -63,7 +59,6 @@ extension GlueHandler {
         return self.context?.channel.isWritable ?? false
     }
 }
-
 
 extension GlueHandler: ChannelDuplexHandler {
     typealias InboundIn = NIOAny
