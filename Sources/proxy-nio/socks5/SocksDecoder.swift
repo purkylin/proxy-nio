@@ -5,7 +5,6 @@
 //  Created by Purkylin King on 2020/9/25.
 //
 
-import Foundation
 import NIO
 
 class SocksDecoder: ByteToMessageDecoder {
@@ -19,7 +18,7 @@ class SocksDecoder: ByteToMessageDecoder {
         case waiting
     }
     
-    var state: State = .initial
+    var state: State = .waiting
     
     func decode(context: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
         switch state {
@@ -31,10 +30,9 @@ class SocksDecoder: ByteToMessageDecoder {
             state = .waiting
             context.fireChannelRead(output)
         case .auth:
-            // TODO
             var peekBuffer = buffer
-            guard let request = try RequestInitial(from: &peekBuffer) else { return .needMoreData }
-            let output = self.wrapInboundOut(SocksRequest.initial(req: request))
+            guard let request = try RequestAuth(from: &peekBuffer) else { return .needMoreData }
+            let output = self.wrapInboundOut(SocksRequest.auth(req: request))
             buffer = peekBuffer
             state = .waiting
             context.fireChannelRead(output)
@@ -52,7 +50,18 @@ class SocksDecoder: ByteToMessageDecoder {
         return .continue
     }
     
+    func decodeLast(context: ChannelHandlerContext, buffer: inout ByteBuffer, seenEOF: Bool) throws -> DecodingState {
+        // This method is needed, otherwise will infinite loop
+        assert(state == .waiting)
+        return .needMoreData
+    }
+    
+    func decoderAdded(context: ChannelHandlerContext) {
+        logger.info("has added decoder")
+        state = .initial
+    }
+    
     func decoderRemoved(context: ChannelHandlerContext) {
-        logger.info("remove decoder")
+        logger.info("has remove decoder")
     }
 }

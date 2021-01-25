@@ -5,30 +5,24 @@
 //  Created by Purkylin King on 2020/9/25.
 //
 
-import Foundation
 import NIO
 
 class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
     typealias InboundIn = SocksRequest
     typealias OutboundOut = SocksResponse
     
-    private let decoder = SocksDecoder()
+    private let decoder: SocksDecoder
 
     private let serverPort: Int
     private let auth: SocksServerConfiguration.Auth
     
-    init(config: SocksServerConfiguration) {
+    private var completion: () -> Void
+    
+    init(config: SocksServerConfiguration, decoder: SocksDecoder, completion: @escaping () -> Void) {
         self.serverPort = config.port
         self.auth = config.auth
-    }
-    
-    func channelActive(context: ChannelHandlerContext) {
-        let handler = ByteToMessageHandler(decoder)
-    
-        // context.pipeline.addHandlers([handler, MessageToByteHandler(SocksEncoder())], position: .before(self)).cascade(to: nil)
-        context.pipeline.addHandler(handler, name: "decoder")
-            .and(context.pipeline.addHandler(MessageToByteHandler(SocksEncoder()), name: "encoder"))
-            .cascade(to: nil)
+        self.decoder = decoder
+        self.completion = completion
     }
     
     func getAuthMethod(supportMethods: [Socks.AuthType]) -> Socks.AuthType {
@@ -51,7 +45,7 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
             logger.info("receive initial")
             let authMethod = getAuthMethod(supportMethods: request.methods)
             let response = SocksResponse.initial(method: authMethod)
-            context.write(self.wrapOutboundOut(response)).cascade(to: nil)
+            context.write(self.wrapOutboundOut(response), promise: nil)
             
             switch authMethod {
             case .none:
@@ -63,15 +57,23 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
             default:
                 context.channel.close(mode: .output).cascade(to: nil)
             }
+        case .auth(let request):
+            logger.info("receive auth")
+            let success = checkAuth(username: request.username, password: request.password)
+            let response = SocksResponse.auth(success: success)
+            decoder.state = .cmd
+            context.writeAndFlush(self.wrapOutboundOut(response), promise: nil)
         case .command(let request):
             logger.info("receive command")
             switch request.cmd {
             case .connect:
                 connectTo(host: request.addr.host!, port: request.port, context: context)
             case .bind:
+                // Current bind command is not supported
                 let response = SocksResponse.command(type: .unsupported, addr: SocksAddress.zero(for: .v4), port: 0)
-                context.write(self.wrapOutboundOut(response)).cascade(to: nil)
+                context.write(self.wrapOutboundOut(response), promise: nil)
             case .udp:
+                // TODO
                 break
             }
         default:
@@ -86,17 +88,18 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
     
     func connectTo(host: String, port: UInt16, context: ChannelHandlerContext)  {
         let future = ClientBootstrap(group: context.eventLoop).connect(host: host, port: Int(port))
-        future.flatmp
+       
         future.whenComplete { result in
             switch result {
             case .success(let channel):
+                logger.info("connect host success")
                 let response = SocksResponse.command(type: .success, addr: .zero(for: .v4), port: 0)
-                context.writeAndFlush(self.wrapOutboundOut(response)).whenComplete { result in
-                    print(result)
+                context.writeAndFlush(self.wrapOutboundOut(response)).whenComplete { [unowned self] result in
+                    self.completion()
                     context.channel.relay(peerChannel: channel).and(context.pipeline.removeHandler(self)).cascade(to: nil)
                 }
             case .failure(let error):
-                print(error.localizedDescription)
+                logger.error("connect host failed, \(error.localizedDescription)")
                 let response = SocksResponse.command(type: .unreachable, addr: .zero(for: .v4), port: 0)
                 context.writeAndFlush(self.wrapOutboundOut(response), promise: nil)
                 context.close(mode: .output, promise: nil)
@@ -106,18 +109,6 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
     
     func handlerRemoved(context: ChannelHandlerContext) {
         logger.info("remove socks handler")
-
-        let promise = context.eventLoop.makePromise(of: Void.self)
-        context.pipeline.removeHandler(name: "decoder", promise: promise)
-        context.pipeline.removeHandler(name: "encoder", promise: promise)
-        promise.futureResult.always { result in
-            let ctx = context
-            print("dd")
-        }
-//        context.pipeline.removeHandler(name: "decoder").and(context.pipeline.removeHandler(name: "encoder")).whenComplete { result in
-//            let ctx = context
-//            print("dd")
-//        }
     }
     
     private var needAuth: Bool {
@@ -137,6 +128,3 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
         return false
     }
 }
-
-
-extension MessageToByteHandler: RemovableChannelHandler { }

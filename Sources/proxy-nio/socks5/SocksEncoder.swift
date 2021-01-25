@@ -5,7 +5,6 @@
 //  Created by Purkylin King on 2021/1/23.
 //
 
-import Foundation
 import NIO
 
 class SocksEncoder: MessageToByteEncoder, RemovableChannelHandler {
@@ -29,3 +28,5 @@ extension SocksResponse {
         }
     }
 }
+
+extension MessageToByteHandler: RemovableChannelHandler { }

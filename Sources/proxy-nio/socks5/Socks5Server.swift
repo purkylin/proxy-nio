@@ -45,7 +45,7 @@ public final class Socks5Server {
              .childChannelInitializer { channel in
                  // Ensure we don't read faster than we can write by adding the BackPressureHandler into the pipeline.
                  channel.pipeline.addHandler(BackPressureHandler()).flatMap { v in
-                    channel.pipeline.addHandler(SocksHandler(config: config))
+                    channel.pipeline.configSocks(config: config)
                  }
              }
              // Enable SO_REUSEADDR for the accepted Channels
@@ -68,5 +68,18 @@ public final class Socks5Server {
     
     public func stop() {
         try? group.syncShutdownGracefully()
+    }
+}
+
+extension ChannelPipeline {
+    func configSocks(config: SocksServerConfiguration) -> EventLoopFuture<Void> {
+        let encoderHandler = MessageToByteHandler(SocksEncoder())
+        let decoder = SocksDecoder()
+        let decoderHandler = ByteToMessageHandler(decoder)
+        let handler = SocksHandler(config: config, decoder: decoder) {
+            self.removeHandler(encoderHandler).and(self.removeHandler(decoderHandler)).cascade(to: nil)
+        }
+        
+        return self.addHandlers(encoderHandler, decoderHandler, handler)
     }
 }
