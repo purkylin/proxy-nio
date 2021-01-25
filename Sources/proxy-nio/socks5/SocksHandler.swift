@@ -25,18 +25,6 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
         self.completion = completion
     }
     
-    func getAuthMethod(supportMethods: [Socks.AuthType]) -> Socks.AuthType {
-        guard needAuth else {
-            return .none
-        }
-        
-        if supportMethods.contains(.password) {
-            return .password
-        } else {
-            return .unsupported
-        }
-    }
-    
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let req = self.unwrapInboundIn(data)
         
@@ -73,8 +61,7 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
                 let response = SocksResponse.command(type: .unsupported, addr: SocksAddress.zero(for: .v4), port: 0)
                 context.write(self.wrapOutboundOut(response), promise: nil)
             case .udp:
-                // TODO
-                break
+                beginUDP(context: context)
             }
         default:
             break
@@ -107,15 +94,48 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
         }
     }
     
+    func beginUDP(context: ChannelHandlerContext) {
+        let bootstrap = DatagramBootstrap(group: context.eventLoop)
+            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+            .channelOption(ChannelOptions.recvAllocator, value: FixedSizeRecvByteBufferAllocator(capacity: 30 * 2048))
+            .channelInitializer { channel in
+                channel.pipeline.addHandler(UDPHandler())
+            }
+        
+        let future = bootstrap.bind(host: "0.0.0.0", port: 0)
+        future.whenComplete { result in
+            switch result {
+            case .success(let channel):
+                guard let address = channel.localAddress, let port = address.port else {
+                    fatalError("bind udp failed")
+                }
+                
+                logger.info(.init(stringLiteral: "bind udp on: \(port)"))
+                
+                let response = SocksResponse.command(type: .success, addr: .zero(for: .v4), port: UInt16(port))
+                context.writeAndFlush(self.wrapOutboundOut(response), promise: nil)
+            case .failure(let error):
+                logger.error(.init(stringLiteral: error.localizedDescription))
+                let response = SocksResponse.command(type: .connectFailed, addr: .zero(for: .v4), port: 0)
+                context.writeAndFlush(self.wrapOutboundOut(response), promise: nil)
+                context.close(mode: .output, promise: nil)
+            }
+        }
+    }
+    
     func handlerRemoved(context: ChannelHandlerContext) {
         logger.info("remove socks handler")
     }
     
-    private var needAuth: Bool {
-        if case .pass = auth {
-            return true
+    private func getAuthMethod(supportMethods: [Socks.AuthType]) -> Socks.AuthType {
+        guard needAuth else {
+            return .none
+        }
+        
+        if supportMethods.contains(.password) {
+            return .password
         } else {
-            return false
+            return .unsupported
         }
     }
     
@@ -126,5 +146,13 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
             }
         }
         return false
+    }
+    
+    private var needAuth: Bool {
+        if case .pass = auth {
+            return true
+        } else {
+            return false
+        }
     }
 }

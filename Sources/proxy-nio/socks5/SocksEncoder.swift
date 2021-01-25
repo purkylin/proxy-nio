@@ -1,5 +1,5 @@
 //
-//  File.swift
+//  SocksEncoder.swift
 //  
 //
 //  Created by Purkylin King on 2021/1/23.
@@ -24,7 +24,7 @@ extension SocksResponse {
         case .auth(let success):
             return [0x01, success ? 0 : 1]
         case let .command(type, addr, port):
-            return [Socks.version, type.rawValue, 0x0, addr.atyp.rawValue] + addr.bytes + port.bytes
+            return [Socks.version, type.rawValue, 0x0] + addr.bytes + port.bytes
         }
     }
 }

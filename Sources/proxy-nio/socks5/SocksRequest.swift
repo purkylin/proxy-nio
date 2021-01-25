@@ -5,8 +5,6 @@
 //  Created by Purkylin King on 2020/9/25.
 //
 
-// Document: https://tools.ietf.org/html/rfc1928 and https://tools.ietf.org/html/rfc1929
-
 import NIO
 
 enum SocksRequest {
