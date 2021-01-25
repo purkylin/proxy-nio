@@ -25,6 +25,6 @@ python udpchk.py -p localhost  -P 1080
 
 ## RFC Documents
 
-1. [SOCKS Protocol Version 5](// Document: https://tools.ietf.org/html/rfc1928)
+1. [SOCKS Protocol Version 5](https://tools.ietf.org/html/rfc1928)
 2. [Username/Password Authentication for SOCKS V5](https://tools.ietf.org/html/rfc1929)
 
