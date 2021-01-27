@@ -58,7 +58,6 @@ extension SSRelayHandler {
                     var outBuffer = context.channel.allocator.buffer(capacity: ciphertext.count)
                     outBuffer.writeBytes(ciphertext)
                     self.context?.write(self.wrapOutboundOut(outBuffer), promise: nil)
-     
                 }
             }
         } catch {
@@ -106,7 +105,6 @@ extension SSRelayHandler: ChannelDuplexHandler {
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        logger.debug("receive message from \(context.channel.remoteAddress)")
         self.partner?.partnerWrite(data)
     }
 
@@ -126,7 +124,6 @@ extension SSRelayHandler: ChannelDuplexHandler {
     }
 
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-//        print("error: \(error.localizedDescription)")
         self.partner?.partnerCloseFull()
     }
 

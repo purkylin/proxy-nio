@@ -8,7 +8,7 @@
 import NIO
 import Logging
 
-public struct SocksServerConfiguration {
+public struct SocksConfiguration {
     public enum Auth {
         case none
         case pass(username: String, password: String)
@@ -22,7 +22,7 @@ public struct SocksServerConfiguration {
         self.port = port
     }
     
-    public static let `default` = SocksServerConfiguration(auth: .none, port: 1080)
+    public static let `default` = SocksConfiguration(auth: .none, port: 1080)
 }
 
 public final class Socks5Server {
@@ -31,7 +31,7 @@ public final class Socks5Server {
     
     public init() { }
     
-    public func start(config: SocksServerConfiguration = .default) {
+    public func start(config: SocksConfiguration = .default) {
         if isRunning {
             logger.warning("socks5 server has started")
             return
@@ -72,7 +72,7 @@ public final class Socks5Server {
 }
 
 extension ChannelPipeline {
-    func configSocks(config: SocksServerConfiguration) -> EventLoopFuture<Void> {
+    func configSocks(config: SocksConfiguration) -> EventLoopFuture<Void> {
         let encoderHandler = MessageToByteHandler(SocksEncoder())
         let decoder = SocksDecoder()
         let decoderHandler = ByteToMessageHandler(decoder)

@@ -13,8 +13,6 @@ class GlueHandler {
     private var context: ChannelHandlerContext?
 
     private var pendingRead: Bool = false
-    
-    var pendingBytes: [UInt8] = []
 
     private init() { }
 }
@@ -64,17 +62,6 @@ extension GlueHandler: ChannelDuplexHandler {
     typealias InboundIn = NIOAny
     typealias OutboundIn = NIOAny
     typealias OutboundOut = NIOAny
-
-    func handlerAdded(context: ChannelHandlerContext) {
-        self.context = context
-        
-        if pendingBytes.count > 0 {
-            let buffer = context.channel.allocator.buffer(bytes: pendingBytes)
-            let out = NIOAny(buffer)
-            context.write(out, promise: nil)
-            context.flush()
-        }
-    }
 
     func handlerRemoved(context: ChannelHandlerContext) {
         self.context = nil

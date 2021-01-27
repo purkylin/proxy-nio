@@ -7,15 +7,60 @@
 
 import NIO
 
+public struct ShadowsocksConfiguration {
+    public enum Method {
+        case aes_128_gcm
+        case aes_192_gcm
+        case aes_256_gcm
+        
+        var keyLen: Int {
+            switch self {
+            case .aes_128_gcm:
+                return 16
+            case .aes_192_gcm:
+                return 24
+            case .aes_256_gcm:
+                return 32
+            }
+        }
+        
+        var saltLen: Int {
+            switch self {
+            case .aes_128_gcm:
+                return 16
+            case .aes_192_gcm:
+                return 24
+            case .aes_256_gcm:
+                return 32
+            }
+        }
+    }
+    
+    let localPort: Int
+
+    let host: String
+    let port: Int
+    let method: Method
+    let password: String
+    
+    public init(host: String, port: Int, password: String, method: Method = .aes_256_gcm, localPort: Int = 1080) {
+        self.host = host
+        self.port = port
+        self.password = password
+        self.method = method
+        self.localPort = localPort
+    }
+}
+
 public final class ShadowsocksServer {
     private let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     public private(set) var isRunning: Bool = false
     
     public init() { }
     
-    public func start(config: SocksServerConfiguration = .default) {
+    public func start(config: ShadowsocksConfiguration) {
         if isRunning {
-            logger.warning("socks5 server has started")
+            logger.warning("shadowsocks server has started")
             return
         }
         
@@ -35,7 +80,7 @@ public final class ShadowsocksServer {
              .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 16)
              .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
         do {
-            let channel = try bootstrap.bind(host: "::0", port: config.port).wait()
+            let channel = try bootstrap.bind(host: "::0", port: config.localPort).wait()
             logger.debug("start ss server on port \(config.port) success")
             isRunning = true
             
@@ -54,7 +99,7 @@ public final class ShadowsocksServer {
 }
 
 extension ChannelPipeline {
-    func configShadowsocks(config: SocksServerConfiguration) -> EventLoopFuture<Void> {
+    func configShadowsocks(config: ShadowsocksConfiguration) -> EventLoopFuture<Void> {
         let encoderHandler = MessageToByteHandler(SocksEncoder())
         let decoder = SocksDecoder()
         let decoderHandler = ByteToMessageHandler(decoder)

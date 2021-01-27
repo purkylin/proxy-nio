@@ -14,11 +14,11 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
     private let decoder: SocksDecoder
 
     private let serverPort: Int
-    private let auth: SocksServerConfiguration.Auth
+    private let auth: SocksConfiguration.Auth
     
     private var completion: () -> Void
     
-    init(config: SocksServerConfiguration, decoder: SocksDecoder, completion: @escaping () -> Void) {
+    init(config: SocksConfiguration, decoder: SocksDecoder, completion: @escaping () -> Void) {
         self.serverPort = config.port
         self.auth = config.auth
         self.decoder = decoder

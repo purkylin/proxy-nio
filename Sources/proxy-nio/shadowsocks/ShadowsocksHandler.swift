@@ -13,17 +13,14 @@ class ShadowsocksHandler: ChannelInboundHandler {
     typealias InboundIn = SocksRequest
     typealias OutboundOut = SocksResponse
     
-    let serverPort: Int
-    let auth: SocksServerConfiguration.Auth
-    
-    var requestCommand: RequestCommand!
+    private let config: ShadowsocksConfiguration
+    private var requestCommand: RequestCommand!
 
     private let decoder: SocksDecoder
     private let completion: () -> Void
     
-    init(config: SocksServerConfiguration, decoder: SocksDecoder, completion: @escaping () -> Void) {
-        self.serverPort = config.port
-        self.auth = config.auth
+    init(config: ShadowsocksConfiguration, decoder: SocksDecoder, completion: @escaping () -> Void) {
+        self.config = config
         self.decoder = decoder
         self.completion = completion
     }
@@ -41,22 +38,14 @@ class ShadowsocksHandler: ChannelInboundHandler {
             logger.debug("receive command")
             
             self.requestCommand = request
-            
-            guard let host = ProcessInfo.processInfo.environment["SERVER_IP"] else {
-                fatalError("Not found server ip")
-            }
-            
-            guard let portString = ProcessInfo.processInfo.environment["SERVER_PORT"], let port = Int(portString, radix: 10) else {
-                fatalError("Invalid port")
-            }
-            
+
             switch request.cmd {
             case .connect:
-//                connectTo(host: "localhost", port: UInt16(1082), context: context)
-                 connectTo(host: host, port: UInt16(port), context: context)
+                connectTo(host: config.host, port: UInt16(config.port), context: context)
             case .bind:
                 fatalError("invalid command")
             case .udp:
+                // TODO: crypto part
                 beginUDP(context: context)
             }
         default:
@@ -80,9 +69,7 @@ class ShadowsocksHandler: ChannelInboundHandler {
                 context.writeAndFlush(self.wrapOutboundOut(response)).whenComplete { [unowned self] result in
                     self.completion()
                     
-                    // AES-256-GCM
-                    let cryptor = AEADCryptor(password: "mygod")
-                    
+                    let cryptor = AEADCryptor(password: config.password, keyLen: config.method.keyLen, saltLen: config.method.saltLen)
                     context.channel.relayWithCryptor(peerChannel: channel, cryptor: cryptor).and(context.pipeline.removeHandler(self)).whenComplete { result in
                         let bytes: [UInt8] = requestCommand.addr.bytes + requestCommand.port.bytes
                         let info = try! cryptor.encrypt(payload: bytes)

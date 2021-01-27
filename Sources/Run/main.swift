@@ -16,12 +16,14 @@ func testSocks() {
 func testSocksWithAuth() {
     // curl -x socks5://admin:password@localhost:1080 baidu.com
     let server: Socks5Server = Socks5Server()
-    server.start(config: SocksServerConfiguration(auth: .pass(username: "admin", password: "password1"), port: 1080))
+    server.start(config: SocksConfiguration(auth: .pass(username: "admin", password: "password1"), port: 1080))
 }
 
 func testShadowsocks() {
     let server: ShadowsocksServer = ShadowsocksServer()
-    server.start(config: .default)
+    // Config your shadowsocks server
+    let config = ShadowsocksConfiguration(host: "your_host", port: 1080, password: "your password")
+    server.start(config: config)
 }
 
 testShadowsocks()
