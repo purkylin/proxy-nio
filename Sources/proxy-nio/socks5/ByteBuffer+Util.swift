@@ -40,3 +40,9 @@ extension ByteBuffer {
         return self.readBytes(length: self.readableBytes) ?? []
     }
 }
+
+extension FixedWidthInteger {
+    var bytes: [UInt8] {
+        withUnsafeBytes(of: self.bigEndian, Array.init)
+    }
+}

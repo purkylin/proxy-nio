@@ -80,12 +80,10 @@ class ShadowsocksHandler: ChannelInboundHandler {
                 context.writeAndFlush(self.wrapOutboundOut(response)).whenComplete { [unowned self] result in
                     self.completion()
                     
-                    let salt = Data.random(length: 32)
-                    let cryptor = Cryptor(password: "mygod", encryptSalt: salt)
+                    // AES-256-GCM
+                    let cryptor = AEADCryptor(password: "mygod")
                     
                     context.channel.relayWithCryptor(peerChannel: channel, cryptor: cryptor).and(context.pipeline.removeHandler(self)).whenComplete { result in
-                        print(result)
-                        
                         let bytes: [UInt8] = requestCommand.addr.bytes + requestCommand.port.bytes
                         let info = try! cryptor.encrypt(payload: bytes)
                         var buffer = channel.allocator.buffer(capacity: info.count)

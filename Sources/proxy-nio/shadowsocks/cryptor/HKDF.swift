@@ -8,12 +8,6 @@
 import Foundation
 import Crypto
 
-extension FixedWidthInteger {
-    var bytes: [UInt8] {
-        withUnsafeBytes(of: self.bigEndian, Array.init)
-    }
-}
-
 func hkdf_sha1(_ key: Data, salt: Data, info: Data, outputSize: Int = 20) -> Data? {
     // It would be nice to make this generic over <H: HashFunction> if HashFunction had byteCount instead of each hash
     // individually implementing it.

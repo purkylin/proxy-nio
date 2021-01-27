@@ -1,5 +1,5 @@
 //
-//  Cryptor.swift
+//  AEADCryptor.swift
 //  
 //
 //  Created by Purkylin King on 2020/10/15.
@@ -8,59 +8,64 @@
 import Foundation
 import Crypto
 import struct NIO.ByteBuffer
-import Logging
 
-fileprivate let maxChunkSize = 0x3FFF
-fileprivate let info = "ss-subkey".data(using: .utf8)!
-
-struct Nonce {
-    let length: Int
-    private var storage: [UInt8]
+public class AEADCryptor: Cryptor {
+    private let password: String
+    private let keyLen: Int
+    private let saltLen: Int
     
-    // Little endian
-    var bytes: [UInt8] {
-        return storage
+    private lazy var encryptor: AEADCryptor.Encryptor = {
+        let salt = Data.random(length: saltLen)
+        return Encryptor(password: password, salt: salt, keyLen: keyLen)
+    }()
+    
+    private var decryptor: AEADCryptor.Decryptor?
+    
+    required init(password: String, keyLen: Int = 32, saltLen: Int = 32) {
+        self.password = password
+        self.keyLen = keyLen
+        self.saltLen = saltLen
     }
     
-    init(length: Int = 12) {
-        self.length = length
-        self.storage = Array(repeating: 0, count: length)
+    func encrypt(payload: [UInt8]) throws -> [UInt8] {
+        try encryptor.encrypt(bytes: payload)
     }
     
-    mutating func increment() {
-        for (idx, v) in storage.enumerated() {
-            let overflow = v == UInt8.max
-            storage[idx] = v &+ 1
-            
-            if !overflow {
-                break
+    func decrypt(payload: [UInt8]) throws -> [UInt8] {
+        let ciphertext: [UInt8]
+        
+        if decryptor == nil {
+            guard payload.count >= saltLen else {
+                logger.warning("The salt length is not enough")
+                return []
             }
+            
+            let salt = payload[0..<saltLen]
+            
+            self.decryptor = Decryptor(password: password, salt: Data(salt), keyLen: keyLen)
+            ciphertext = Array(payload[saltLen...])
+        } else {
+            ciphertext = payload
         }
+        
+        return try self.decryptor!.decrypt(bytes: ciphertext)
     }
 }
 
-public class Cryptor {
-    var encryptor: Encryptor
-    var decryptor: Decryptor?
-    var password: String
-    
-    init(password: String, encryptSalt: Data) {
-        self.password = password
-        self.encryptor = Encryptor(password: password, salt: encryptSalt)
-    }
-    
-    class Encryptor {
+extension AEADCryptor {
+    private class Encryptor {
         private let key: SymmetricKey
         private let salt: Data
         private var nonce = Nonce()
-        private let keyLen = 32
+        private let keyLen: Int
         private var hasSendSalt: Bool = false
         
-        init(password: String, salt: Data) {
+        init(password: String, salt: Data, keyLen: Int) {
             self.salt = salt
+            self.keyLen = keyLen
             
             let derivedKey = evpBytesToKey(password: password, keyLen: keyLen)
-            let subkey = hkdf_sha1(Data(derivedKey), salt: salt, info: info, outputSize: keyLen)!
+            let subkey = hkdf_sha1(Data(derivedKey), salt: salt, info: ssInfo, outputSize: keyLen)!
             self.key = SymmetricKey(data: subkey)
         }
         
@@ -120,19 +125,20 @@ public class Cryptor {
         }
     }
     
-    class Decryptor {
+    private class Decryptor {
         private let key: SymmetricKey
         private let salt: Data?
         private var nonce = Nonce()
-        private let keyLen = 32
+        private let keyLen: Int
         
         private var buffer = ByteBuffer(bytes: [])
         
-        init(password: String, salt: Data) {
+        init(password: String, salt: Data, keyLen: Int) {
             self.salt = salt
+            self.keyLen = keyLen
             
             let derivedKey = evpBytesToKey(password: password, keyLen: keyLen)
-            let subkey = hkdf_sha1(Data(derivedKey), salt: salt, info: info, outputSize: keyLen)!
+            let subkey = hkdf_sha1(Data(derivedKey), salt: salt, info: ssInfo, outputSize: keyLen)!
             self.key = SymmetricKey(data: subkey)
         }
         
@@ -185,28 +191,5 @@ public class Cryptor {
             let sealedBox = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: nonce.bytes), ciphertext: bytes, tag: tag)
             return try AES.GCM.open(sealedBox, using: key).bytes
         }
-    }
-
-    func encrypt(payload: [UInt8]) throws -> [UInt8] {
-        try encryptor.encrypt(bytes: payload)
-    }
-    
-    func decrypt(payload: [UInt8]) throws -> [UInt8] {
-        let ciphertext: [UInt8]
-        
-        if decryptor == nil {
-            guard payload.count >= 32 else {
-                return []
-            }
-            
-            let salt = payload[0..<32]
-            
-            self.decryptor = Decryptor(password: password, salt: Data(salt))
-            ciphertext = Array(payload[32...])
-        } else {
-            ciphertext = payload
-        }
-        
-        return try self.decryptor!.decrypt(bytes: ciphertext)
     }
 }
