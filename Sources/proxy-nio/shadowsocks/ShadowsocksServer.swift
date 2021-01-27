@@ -36,7 +36,7 @@ public final class ShadowsocksServer {
              .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
         do {
             let channel = try bootstrap.bind(host: "::0", port: config.port).wait()
-            logger.info("start ss server on port \(config.port) success")
+            logger.debug("start ss server on port \(config.port) success")
             isRunning = true
             
             try channel.closeFuture.wait()
@@ -44,7 +44,7 @@ public final class ShadowsocksServer {
             logger.error("start ss server on port \(config.port) failed")
         }
         
-        logger.info("ss server has stopped")
+        logger.debug("ss server has stopped")
         isRunning = false
     }
     

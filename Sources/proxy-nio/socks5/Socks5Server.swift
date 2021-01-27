@@ -54,7 +54,7 @@ public final class Socks5Server {
              .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
         do {
             let channel = try bootstrap.bind(host: "::0", port: config.port).wait()
-            logger.info("start socks server on port \(config.port) success")
+            logger.debug("start socks server on port \(config.port) success")
             isRunning = true
             
             try channel.closeFuture.wait()
@@ -62,7 +62,7 @@ public final class Socks5Server {
             logger.error("start socks server on port \(config.port) failed")
         }
         
-        logger.info("socks5 server has stopped")
+        logger.debug("socks5 server has stopped")
         isRunning = false
     }
     

@@ -39,7 +39,7 @@ public final class HttpServer {
         
         do {
             let channel = try bootstrap.bind(host: "::1", port: config.port).wait()
-            logger.info("start socks server on port \(config.port) success")
+            logger.debug("start socks server on port \(config.port) success")
             isRunning = true
             
             try channel.closeFuture.wait()
@@ -47,7 +47,7 @@ public final class HttpServer {
             logger.error("start socks server on port \(config.port) failed")
         }
         
-        logger.info("socks server has stopped")
+        logger.debug("socks server has stopped")
         isRunning = false
     }
     

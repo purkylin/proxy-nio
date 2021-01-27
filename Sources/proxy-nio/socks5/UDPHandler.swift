@@ -40,7 +40,7 @@ class UDPHandler: ChannelInboundHandler {
             guard let data = buffer.readBytes(length: buffer.readableBytes) else { return }
             let header = UDPHeader(addr: .zero(for: .v4), port: 0, data: data)
             let outbuffer = context.channel.allocator.buffer(bytes: header.bytes)
-            // logger.info(.init(stringLiteral: "out: \(header.bytes)"))
+            // logger.debug(.init(stringLiteral: "out: \(header.bytes)"))
             let envolope = AddressedEnvelope(remoteAddress: source!, data: outbuffer, metadata: nil)
             context.writeAndFlush(self.wrapOutboundOut(envolope), promise: nil)
         }

@@ -30,7 +30,7 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
         
         switch req {
         case .initial(let request):
-            logger.info("receive initial")
+            logger.debug("receive initial")
             let authMethod = getAuthMethod(supportMethods: request.methods)
             let response = SocksResponse.initial(method: authMethod)
             context.write(self.wrapOutboundOut(response), promise: nil)
@@ -46,13 +46,13 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
                 context.channel.close(mode: .output).cascade(to: nil)
             }
         case .auth(let request):
-            logger.info("receive auth")
+            logger.debug("receive auth")
             let success = checkAuth(username: request.username, password: request.password)
             let response = SocksResponse.auth(success: success)
             decoder.state = .cmd
             context.writeAndFlush(self.wrapOutboundOut(response), promise: nil)
         case .command(let request):
-            logger.info("receive command")
+            logger.debug("receive command")
             switch request.cmd {
             case .connect:
                 connectTo(host: request.addr.host!, port: request.port, context: context)
@@ -79,7 +79,7 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
         future.whenComplete { result in
             switch result {
             case .success(let channel):
-                logger.info("connect host success")
+                logger.debug("connect host success")
                 let response = SocksResponse.command(type: .success, addr: .zero(for: .v4), port: 0)
                 context.writeAndFlush(self.wrapOutboundOut(response)).whenComplete { [unowned self] result in
                     self.completion()
@@ -110,7 +110,7 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
                     fatalError("bind udp failed")
                 }
                 
-                logger.info(.init(stringLiteral: "bind udp on: \(port)"))
+                logger.debug(.init(stringLiteral: "bind udp on: \(port)"))
                 
                 let response = SocksResponse.command(type: .success, addr: .zero(for: .v4), port: UInt16(port))
                 context.writeAndFlush(self.wrapOutboundOut(response), promise: nil)
@@ -124,7 +124,7 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
     }
     
     func handlerRemoved(context: ChannelHandlerContext) {
-        logger.info("remove socks handler")
+        logger.debug("remove socks handler")
     }
     
     private func getAuthMethod(supportMethods: [Socks.AuthType]) -> Socks.AuthType {

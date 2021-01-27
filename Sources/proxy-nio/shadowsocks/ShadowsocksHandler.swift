@@ -33,12 +33,12 @@ class ShadowsocksHandler: ChannelInboundHandler {
         
         switch req {
         case .initial:
-            logger.info("receive initial")
+            logger.debug("receive initial")
             let response = SocksResponse.initial(method: .none)
             decoder.state = .cmd
             context.writeAndFlush(self.wrapOutboundOut(response), promise: nil)
         case .command(let request):
-            logger.info("receive command")
+            logger.debug("receive command")
             
             self.requestCommand = request
             
@@ -75,7 +75,7 @@ class ShadowsocksHandler: ChannelInboundHandler {
         future.whenComplete { result in
             switch result {
             case .success(let channel):
-                logger.info("connect host success")
+                logger.debug("connect host success")
                 let response = SocksResponse.command(type: .success, addr: .zero(for: .v4), port: 0)
                 context.writeAndFlush(self.wrapOutboundOut(response)).whenComplete { [unowned self] result in
                     self.completion()
@@ -118,7 +118,7 @@ class ShadowsocksHandler: ChannelInboundHandler {
                     fatalError("bind udp failed")
                 }
                 
-                logger.info(.init(stringLiteral: "bind udp on: \(port)"))
+                logger.debug(.init(stringLiteral: "bind udp on: \(port)"))
                 
                 let response = SocksResponse.command(type: .success, addr: .zero(for: .v4), port: UInt16(port))
                 context.writeAndFlush(self.wrapOutboundOut(response), promise: nil)

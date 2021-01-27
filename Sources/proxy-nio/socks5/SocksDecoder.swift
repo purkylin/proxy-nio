@@ -57,11 +57,11 @@ class SocksDecoder: ByteToMessageDecoder {
     }
     
     func decoderAdded(context: ChannelHandlerContext) {
-        logger.info("has added decoder")
+        logger.debug("has added decoder")
         state = .initial
     }
     
     func decoderRemoved(context: ChannelHandlerContext) {
-        logger.info("has remove decoder")
+        logger.debug("has remove decoder")
     }
 }

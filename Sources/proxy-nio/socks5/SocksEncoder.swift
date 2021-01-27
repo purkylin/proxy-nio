@@ -11,7 +11,7 @@ class SocksEncoder: MessageToByteEncoder, RemovableChannelHandler {
     typealias OutboundIn = SocksResponse
     
     func encode(data: SocksResponse, out: inout ByteBuffer) throws {
-        logger.info("out: \(data.toBytes())")
+        logger.debug("out: \(data.toBytes())")
         out.writeBytes(data.toBytes())
     }
 }

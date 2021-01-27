@@ -8,7 +8,11 @@
 import Foundation
 import Logging
 
-internal var logger = Logger(label: "proxy-nio")
+let logger: Logger = {
+    var obj = Logger(label: "proxy-nio")
+    obj.logLevel = .debug
+    return obj
+}()
 
 struct Socks {
     static let version: UInt8 = 5

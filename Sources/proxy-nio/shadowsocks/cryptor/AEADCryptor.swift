@@ -119,7 +119,7 @@ extension AEADCryptor {
                 output = salt.bytes + output
             }
             
-            logger.info("encrypt chunk once")
+            logger.debug("encrypt chunk once")
             
             return output
         }
@@ -181,7 +181,7 @@ extension AEADCryptor {
                 nonce.increment()
                 buffer = peekBuffer
                 
-                logger.info("decrypt success once")
+                logger.debug("decrypt success once")
             }
             
             return output

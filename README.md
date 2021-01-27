@@ -5,7 +5,7 @@ NIO proxy
 ## Feature | Plan
 
 - [x] socks5 proxy with auth
-- [ ] shadowsocks protocol (override in history commits, restore in near future)
+- [x] shadowsocks protocol(udp is in plan)
 - [x] socsk5 udp relay
 - [ ] socks5 forward
 - [ ] http(s) proxy
