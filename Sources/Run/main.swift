@@ -19,10 +19,13 @@ import proxy_nio
 //udp.start()
 //print("finish")
 
-let server: Socks5Server = Socks5Server()
- server.start(config: .default)
+// let server: Socks5Server = Socks5Server()
+// server.start(config: .default)
 //server.start(config: SocksServerConfiguration(auth: .pass(username: "admin", password: "password1"), port: 1080))
 // curl -x socks5://admin:password@localhost:1080 baidu.com
+
+let server: ShadowsocksServer = ShadowsocksServer()
+server.start(config: .default)
 
 func pton4(host: String, port: Int) -> sockaddr_in? {
     var ipv4Addr = in_addr()
