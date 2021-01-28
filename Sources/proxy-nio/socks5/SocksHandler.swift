@@ -11,7 +11,7 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
     typealias InboundIn = SocksRequest
     typealias OutboundOut = SocksResponse
     
-    private let decoder: SocksDecoder
+    private unowned let decoder: SocksDecoder
 
     private let serverPort: Int
     private let auth: SocksConfiguration.Auth
@@ -79,8 +79,8 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
                 logger.debug("connect host success")
                 let response = SocksResponse.command(type: .success, addr: .zero(for: .v4), port: 0)
                 context.writeAndFlush(self.wrapOutboundOut(response)).whenComplete { [unowned self] result in
-                    self.removeEncoder(context: context)
-                    self.removeDecoder(context: context)
+                    context.pipeline.removeHandler(handlerType: MessageToByteHandler<SocksEncoder>.self)
+                    context.pipeline.removeHandler(handlerType: ByteToMessageHandler<SocksDecoder>.self)
                     context.channel.relay(peerChannel: channel).and(context.pipeline.removeHandler(self)).cascade(to: nil)
                 }
             case .failure(let error):
@@ -155,22 +155,12 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
     }
 }
 
-extension SocksHandler {
-    private func removeDecoder(context: ChannelHandlerContext) {
-        // We drop the future on the floor here as these handlers must all be in our own pipeline, and this should
-        // therefore succeed fast.
-        context.pipeline.context(handlerType: ByteToMessageHandler<SocksDecoder>.self).whenSuccess {
-            context.pipeline.removeHandler(context: $0, promise: nil)
-        }
-    }
-
-    private func removeEncoder(context: ChannelHandlerContext) {
-        context.pipeline.context(handlerType: ByteToMessageHandler<SocksDecoder>.self).whenSuccess {
-            context.pipeline.removeHandler(context: $0, promise: nil)
-        }
-        
-        context.pipeline.context(handlerType: MessageToByteHandler<SocksEncoder>.self).whenSuccess {
-            context.pipeline.removeHandler(context: $0, promise: nil)
+extension ChannelPipeline {
+    func removeHandler<T: RemovableChannelHandler>(handlerType: T.Type) {
+        self.context(handlerType: handlerType).whenSuccess {
+            self.removeHandler(context: $0).whenFailure { error in
+                fatalError(error.localizedDescription)
+            }
         }
     }
 }

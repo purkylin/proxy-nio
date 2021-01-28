@@ -16,13 +16,11 @@ class ShadowsocksHandler: ChannelInboundHandler {
     private let config: ShadowsocksConfiguration
     private var requestCommand: RequestCommand!
 
-    private let decoder: SocksDecoder
-    private let completion: () -> Void
+    private unowned let decoder: SocksDecoder
     
-    init(config: ShadowsocksConfiguration, decoder: SocksDecoder, completion: @escaping () -> Void) {
+    init(config: ShadowsocksConfiguration, decoder: SocksDecoder) {
         self.config = config
         self.decoder = decoder
-        self.completion = completion
     }
     
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -67,7 +65,8 @@ class ShadowsocksHandler: ChannelInboundHandler {
                 logger.debug("connect host success")
                 let response = SocksResponse.command(type: .success, addr: .zero(for: .v4), port: 0)
                 context.writeAndFlush(self.wrapOutboundOut(response)).whenComplete { [unowned self] result in
-                    self.completion()
+                    context.pipeline.removeHandler(handlerType: MessageToByteHandler<SocksEncoder>.self)
+                    context.pipeline.removeHandler(handlerType: ByteToMessageHandler<SocksDecoder>.self)
                     
                     let cryptor = AEADCryptor(password: config.password, keyLen: config.method.keyLen, saltLen: config.method.saltLen)
                     context.channel.relayWithCryptor(peerChannel: channel, cryptor: cryptor).and(context.pipeline.removeHandler(self)).whenComplete { result in

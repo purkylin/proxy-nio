@@ -76,10 +76,7 @@ extension ChannelPipeline {
         let encoderHandler = MessageToByteHandler(SocksEncoder())
         let decoder = SocksDecoder()
         let decoderHandler = ByteToMessageHandler(decoder)
-        let handler = SocksHandler(config: config, decoder: decoder) {
-            self.removeHandler(encoderHandler).and(self.removeHandler(decoderHandler)).cascade(to: nil)
-        }
-        
+        let handler = SocksHandler(config: config, decoder: decoder)
         return self.addHandlers(encoderHandler, decoderHandler, handler)
     }
 }
