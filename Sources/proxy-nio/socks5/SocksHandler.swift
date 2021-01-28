@@ -16,13 +16,10 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
     private let serverPort: Int
     private let auth: SocksConfiguration.Auth
     
-    private var completion: () -> Void
-    
-    init(config: SocksConfiguration, decoder: SocksDecoder, completion: @escaping () -> Void) {
+    init(config: SocksConfiguration, decoder: SocksDecoder) {
         self.serverPort = config.port
         self.auth = config.auth
         self.decoder = decoder
-        self.completion = completion
     }
     
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -82,7 +79,8 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
                 logger.debug("connect host success")
                 let response = SocksResponse.command(type: .success, addr: .zero(for: .v4), port: 0)
                 context.writeAndFlush(self.wrapOutboundOut(response)).whenComplete { [unowned self] result in
-                    self.completion()
+                    self.removeEncoder(context: context)
+                    self.removeDecoder(context: context)
                     context.channel.relay(peerChannel: channel).and(context.pipeline.removeHandler(self)).cascade(to: nil)
                 }
             case .failure(let error):
@@ -156,3 +154,25 @@ class SocksHandler: ChannelInboundHandler, RemovableChannelHandler {
         }
     }
 }
+
+extension SocksHandler {
+    private func removeDecoder(context: ChannelHandlerContext) {
+        // We drop the future on the floor here as these handlers must all be in our own pipeline, and this should
+        // therefore succeed fast.
+        context.pipeline.context(handlerType: ByteToMessageHandler<SocksDecoder>.self).whenSuccess {
+            context.pipeline.removeHandler(context: $0, promise: nil)
+        }
+    }
+
+    private func removeEncoder(context: ChannelHandlerContext) {
+        context.pipeline.context(handlerType: ByteToMessageHandler<SocksDecoder>.self).whenSuccess {
+            context.pipeline.removeHandler(context: $0, promise: nil)
+        }
+        
+        context.pipeline.context(handlerType: MessageToByteHandler<SocksEncoder>.self).whenSuccess {
+            context.pipeline.removeHandler(context: $0, promise: nil)
+        }
+    }
+}
+
+

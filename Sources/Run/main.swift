@@ -22,7 +22,7 @@ func testSocksWithAuth() {
 func testShadowsocks() {
     let server: ShadowsocksServer = ShadowsocksServer()
     // Config your shadowsocks server
-    let config = ShadowsocksConfiguration(host: "your_host", port: 1080, password: "your password")
+    let config = ShadowsocksConfiguration(host: "your host", port: 1080, password: "your password")
     server.start(config: config)
 }
 

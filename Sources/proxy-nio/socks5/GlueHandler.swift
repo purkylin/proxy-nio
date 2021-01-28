@@ -63,6 +63,10 @@ extension GlueHandler: ChannelDuplexHandler {
     typealias OutboundIn = NIOAny
     typealias OutboundOut = NIOAny
 
+    func handlerAdded(context: ChannelHandlerContext) {
+        self.context = context
+    }
+    
     func handlerRemoved(context: ChannelHandlerContext) {
         self.context = nil
         self.partner = nil
