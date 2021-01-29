@@ -7,13 +7,16 @@ var targets: [PackageDescription.Target] = [
     .target(name: "proxy-nio",
             dependencies: [
                 .product(name: "NIO", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "Logging", package: "swift-log")]),
     .target(name: "http",
             dependencies: [
                 .product(name: "NIO", package: "swift-nio"),
+                .product(name: "Logging", package: "swift-log"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),]),
     .target(name: "Run", dependencies: [
                 "proxy-nio",
+                "http",
                 .product(name: "Crypto", package: "swift-crypto"),]),
     .testTarget(name: "proxy-nioTests", dependencies: ["proxy-nio"]),
 ]

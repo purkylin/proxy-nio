@@ -7,6 +7,8 @@
 
 import Foundation
 import proxy_nio
+import http
+import Dispatch
 
 func testSocks() {
     let server: Socks5Server = Socks5Server()
@@ -16,7 +18,7 @@ func testSocks() {
 func testSocksWithAuth() {
     // curl -x socks5://admin:password@localhost:1080 baidu.com
     let server: Socks5Server = Socks5Server()
-    server.start(config: SocksConfiguration(auth: .pass(username: "admin", password: "password1"), port: 1080))
+    server.start(config: SocksConfiguration(auth: .pass(username: "admin", password: "password"), port: 1080))
 }
 
 func testShadowsocks() {
@@ -26,4 +28,10 @@ func testShadowsocks() {
     server.start(config: config)
 }
 
-testShadowsocks()
+func testHttp() {
+    // curl -x localhost:1080 baidu.com
+    let server = HttpServer()
+    server.start(port: 1080)
+}
+
+testHttp()

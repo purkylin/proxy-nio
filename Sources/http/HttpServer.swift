@@ -6,6 +6,9 @@
 //
 
 import NIO
+import Logging
+import NIOHTTP1
+import Dispatch
 
 public final class HttpServer {
     private let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
@@ -13,42 +16,29 @@ public final class HttpServer {
     
     public init() { }
     
-    public func start(config: SocksServerConfiguration = .default) {
-        if isRunning {
-            logger.warning("socks server has started")
-            return
-        }
+    public func start(port: Int = 1080) {
+        let logger = Logger(label: "http_server")
         
+        let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
         let bootstrap = ServerBootstrap(group: group)
-            // Specify backlog and enable SO_REUSEADDR for the server itself
-             .serverChannelOption(ChannelOptions.backlog, value: 256)
-             .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+            .serverChannelOption(ChannelOptions.socket(SOL_SOCKET, SO_REUSEADDR), value: 1)
+            .childChannelOption(ChannelOptions.socket(SOL_SOCKET, SO_REUSEADDR), value: 1)
+            .childChannelInitializer { channel in
+                channel.pipeline.addHandler(ByteToMessageHandler(HTTPRequestDecoder(leftOverBytesStrategy: .forwardBytes))).flatMap {
+                    channel.pipeline.addHandler(HTTPResponseEncoder()).flatMap {
+                        channel.pipeline.addHandler(ConnectHandler(logger: Logger(label: "com.apple.nio-connect-proxy.ConnectHandler")))
+                    }
+                }
+            }
 
-             // Set the handlers that are appled to the accepted Channels
-             .childChannelInitializer { channel in
-                 // Ensure we don't read faster than we can write by adding the BackPressureHandler into the pipeline.
-                 channel.pipeline.addHandler(BackPressureHandler()).flatMap { v in
-                    channel.pipeline.addHandler(SocksHandler(config: config))
-                 }
-             }
-
-             // Enable SO_REUSEADDR for the accepted Channels
-             .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
-             .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 16)
-             .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
-        
         do {
-            let channel = try bootstrap.bind(host: "::1", port: config.port).wait()
-            logger.debug("start socks server on port \(config.port) success")
+            let channel = try bootstrap.bind(host: "::0", port: port).wait()
+            logger.info("start http server on port \(port) success")
             isRunning = true
-            
             try channel.closeFuture.wait()
         } catch {
-            logger.error("start socks server on port \(config.port) failed")
+            logger.error("start http server on port \(port) failed")
         }
-        
-        logger.debug("socks server has stopped")
-        isRunning = false
     }
     
     public func stop() {
