@@ -14,7 +14,7 @@ NIO proxy
 
 ## Requirement
 
-* maxOS 10.15
+* macOS 10.15
 * swift 5.3
 
 ## Check UDP
